@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/Thebassplayer/crossmint_challenge_one/issues"
   },
-  "homepage": "https://github.com/Thebassplayer/crossmint_challenge_one#readme"
+  "homepage": "https://github.com/Thebassplayer/crossmint_challenge_one#readme",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
 }

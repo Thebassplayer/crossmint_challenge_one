@@ -61,6 +61,9 @@ app.delete("/api/polyanets", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+app.use("*", (req, res) => {
+  res.status(404).json({ error: "Not Found" });
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

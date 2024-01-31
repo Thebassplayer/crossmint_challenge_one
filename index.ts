@@ -7,8 +7,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
 
-const API_BASE_URL = "https://challenge.crossmint.io/api/";
-const CANDIDATE_ID = "YOUR_CANDIDATE_ID";
+const API_BASE_URL = process.env.API_BASE_URL;
+const CANDIDATE_ID = process.env.CANDIDATE_ID;
 
 // Function to create a Polyanet
 app.post("/api/polyanets", async (req, res) => {

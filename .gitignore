@@ -1,0 +1,11 @@
+# Node.js
+node_modules/
+
+# dotenv environment variables file
+.env
+
+# VSCode settings
+.vscode
+
+# macOS
+.DS_Store

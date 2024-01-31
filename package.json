@@ -2,7 +2,7 @@
   "name": "crossmint_challenge_one",
   "version": "1.0.0",
   "description": "crossmint_interview_challenge_one",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "start": "node dist/index.js",
     "dev": "nodemon index.ts",
@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/Thebassplayer/crossmint_challenge_one#readme",
   "dependencies": {
+    "dotenv": "^16.4.1",
     "express": "^4.18.2",
     "node-fetch": "^2.7.0"
   },

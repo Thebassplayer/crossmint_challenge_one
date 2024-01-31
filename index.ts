@@ -1,6 +1,8 @@
 import express from "express";
 import bodyParser from "body-parser";
 import fetch from "node-fetch";
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,9 +15,8 @@ const CANDIDATE_ID = process.env.CANDIDATE_ID;
 // Function to create a Polyanet
 app.post("/api/polyanets", async (req, res) => {
   const { row, column } = req.body;
-  const url = `${API_BASE_URL}polyanets`;
+  const url = `${API_BASE_URL}/polyanets`;
   const body = { row, column, candidateId: CANDIDATE_ID };
-
   try {
     const response = await fetch(url, {
       method: "POST",
@@ -31,6 +32,7 @@ app.post("/api/polyanets", async (req, res) => {
       res.status(response.status).json({ error: response.statusText });
     }
   } catch (error) {
+    console.log(error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -38,11 +40,16 @@ app.post("/api/polyanets", async (req, res) => {
 // Function to delete a Polyanet
 app.delete("/api/polyanets", async (req, res) => {
   const { row, column } = req.body;
-  const url = `${API_BASE_URL}polyanets?row=${row}&column=${column}&candidateId=${CANDIDATE_ID}`;
+  const url = `${API_BASE_URL}/polyanets`;
+  const body = { row, column, candidateId: CANDIDATE_ID };
 
   try {
     const response = await fetch(url, {
       method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
     });
 
     if (response.ok) {

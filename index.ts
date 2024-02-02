@@ -70,6 +70,12 @@ const retry = async <T>(
     } catch (error) {
       console.error(error);
       console.log(`Attempt ${attempt} failed. Retrying...`);
+
+      // Calculate dynamic delay based on attempt number
+      const delay = attempt === 1 ? 1000 : 3000;
+
+      console.log(`Waiting for ${delay}ms before retrying...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
 
     attempt++;
@@ -89,16 +95,22 @@ const fetchAstralObject = async (
       const response = await fetch(url, request);
 
       if (response.ok) {
-        res
-          .status(200)
-          .json({ message: `${objectType} operation successful.` });
+        if (!res.headersSent) {
+          res
+            .status(200)
+            .json({ message: `${objectType} operation successful.` });
+        }
       } else {
-        res.status(response.status).json({ error: response.statusText });
+        if (!res.headersSent) {
+          res.status(response.status).json({ error: response.statusText });
+        }
         throw new Error(`Request failed with status ${response.status}`);
       }
     });
   } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   }
 };
 
@@ -111,6 +123,8 @@ const createAstralObject = async (
 ): Promise<void> => {
   const url = `${API_BASE_URL}/${objectType}`;
   let body: string;
+
+  console.log("Object type in createAstralObject: ", objectType);
 
   switch (objectType) {
     case "polyanets":
@@ -347,8 +361,10 @@ const performBulkOperation = async (
 
     res.status(200).json({ message: "Bulk operation completed successfully." });
   } catch (error) {
-    console.error(`Error processing bulk data: ${error.message}`);
-    res.status(400).json({ error: "Invalid bulk data format." });
+    console.error(`Error performing bulk operation: ${error.message}`);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   }
 };
 

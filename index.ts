@@ -13,10 +13,30 @@ const API_BASE_URL = process.env.API_BASE_URL;
 const CANDIDATE_ID = process.env.CANDIDATE_ID;
 
 type Position = { row: string; column: string };
-type PolyanetRequest = {
+type AstralObjectRequest = {
   method: string;
   headers: Record<string, string>;
   body: string;
+};
+
+type Polyanet = {
+  row: string;
+  column: string;
+  candidateId: string;
+};
+
+type Soloon = {
+  row: string;
+  column: string;
+  candidateId: string;
+  color: "blue" | "red" | "purple" | "white";
+};
+
+type Cometh = {
+  row: string;
+  column: string;
+  candidateId: string;
+  direction: "up" | "down" | "right" | "left";
 };
 
 const retry = async <T>(
@@ -39,9 +59,10 @@ const retry = async <T>(
   throw new Error(`Max retries reached. Failed after ${maxAttempts} attempts.`);
 };
 
-const fetchPolyanet = async (
+const fetchAstralObject = async (
+  objectType: string,
   url: string,
-  request: PolyanetRequest,
+  request: AstralObjectRequest,
   res: express.Response
 ): Promise<void> => {
   try {
@@ -49,7 +70,9 @@ const fetchPolyanet = async (
       const response = await fetch(url, request);
 
       if (response.ok) {
-        res.status(200).json({ message: "Polyanet operation successful." });
+        res
+          .status(200)
+          .json({ message: `${objectType} operation successful.` });
       } else {
         res.status(response.status).json({ error: response.statusText });
         throw new Error(`Request failed with status ${response.status}`);
@@ -60,39 +83,91 @@ const fetchPolyanet = async (
   }
 };
 
-const createPolyanet = async (
+const createAstralObject = async (
+  objectType: string,
   position: Position,
-  res: express.Response
+  res: express.Response,
+  req: express.Request
 ): Promise<void> => {
-  const url = `${API_BASE_URL}/polyanets`;
-  const body = JSON.stringify({ ...position, candidateId: CANDIDATE_ID });
+  const url = `${API_BASE_URL}/${objectType}`;
+  let body: string;
 
-  const request: PolyanetRequest = {
+  switch (objectType) {
+    case "polyanets":
+      body = JSON.stringify({
+        ...position,
+        candidateId: CANDIDATE_ID,
+      } as Polyanet);
+      break;
+    case "soloons":
+      const color = req.body.color;
+      body = JSON.stringify({
+        ...position,
+        candidateId: CANDIDATE_ID,
+        color,
+      } as Soloon);
+      break;
+    case "comeths":
+      const direction = req.body.direction;
+      body = JSON.stringify({
+        ...position,
+        candidateId: CANDIDATE_ID,
+        direction,
+      } as Cometh);
+      break;
+    default:
+      throw res.status(400).json({ error: "Invalid astral object type." });
+  }
+
+  const request: AstralObjectRequest = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body,
   };
 
-  await fetchPolyanet(url, request, res);
+  await fetchAstralObject(objectType, url, request, res);
 };
 
-const deletePolyanet = async (
+const deleteAstralObject = async (
+  objectType: string,
   position: Position,
   res: express.Response
 ): Promise<void> => {
-  const url = `${API_BASE_URL}/polyanets`;
-  const body = JSON.stringify({ ...position, candidateId: CANDIDATE_ID });
+  const url = `${API_BASE_URL}/${objectType}`;
+  let body: string;
 
-  const request: PolyanetRequest = {
+  switch (objectType) {
+    case "polyanets":
+      body = JSON.stringify({
+        ...position,
+        candidateId: CANDIDATE_ID,
+      } as Polyanet);
+      break;
+    case "soloons":
+      body = JSON.stringify({
+        ...position,
+        candidateId: CANDIDATE_ID,
+      } as Soloon);
+      break;
+    case "comeths":
+      body = JSON.stringify({
+        ...position,
+        candidateId: CANDIDATE_ID,
+      } as Cometh);
+      break;
+    default:
+      throw res.status(400).json({ error: "Invalid astral object type." });
+  }
+
+  const request: AstralObjectRequest = {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body,
   };
 
-  await fetchPolyanet(url, request, res);
+  await fetchAstralObject(objectType, url, request, res);
 };
 
-// Function to reset the map
 const resetMap = async (
   res: express.Response,
   delayBetweenRequests: number = 1000
@@ -111,9 +186,9 @@ const resetMap = async (
           row: String(row),
           column: String(column),
           candidateId: CANDIDATE_ID,
-        });
+        } as Polyanet);
 
-        const request: PolyanetRequest = {
+        const request: AstralObjectRequest = {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body,
@@ -155,16 +230,18 @@ const resetMap = async (
   }
 };
 
-// Endpoint to create a Polyanet
-app.post("/api/polyanets", (req, res) => {
+// Endpoint to create an astral object
+app.post("/api/:objectType", (req, res) => {
+  const { objectType } = req.params;
   const { row, column } = req.body;
-  createPolyanet({ row, column }, res);
+  createAstralObject(objectType, { row, column }, res, req);
 });
 
-// Endpoint to delete a Polyanet
-app.delete("/api/polyanets", (req, res) => {
+// Endpoint to delete an astral object
+app.delete("/api/:objectType", (req, res) => {
+  const { objectType } = req.params;
   const { row, column } = req.body;
-  deletePolyanet({ row, column }, res);
+  deleteAstralObject(objectType, { row, column }, res);
 });
 
 // Endpoint to reset the map

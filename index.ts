@@ -9,6 +9,19 @@ const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
 
+// Middleware to log every incoming request
+const logRequestsMiddleware = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+};
+
+// Apply middleware to log every request
+app.use(logRequestsMiddleware);
+
 const API_BASE_URL = process.env.API_BASE_URL;
 const CANDIDATE_ID = process.env.CANDIDATE_ID;
 
@@ -25,19 +38,25 @@ type Polyanet = {
   candidateId: string;
 };
 
+type SoloonsColors = "blue" | "red" | "purple" | "white";
+
 type Soloon = {
   row: string;
   column: string;
   candidateId: string;
-  color: "blue" | "red" | "purple" | "white";
+  color: SoloonsColors;
 };
+
+type ComethDirection = "up" | "down" | "right" | "left";
 
 type Cometh = {
   row: string;
   column: string;
   candidateId: string;
-  direction: "up" | "down" | "right" | "left";
+  direction: ComethDirection;
 };
+
+type ObjectType = "polyanets" | "soloons" | "comeths";
 
 const retry = async <T>(
   action: () => Promise<T>,
@@ -60,7 +79,7 @@ const retry = async <T>(
 };
 
 const fetchAstralObject = async (
-  objectType: string,
+  objectType: ObjectType,
   url: string,
   request: AstralObjectRequest,
   res: express.Response
@@ -84,10 +103,11 @@ const fetchAstralObject = async (
 };
 
 const createAstralObject = async (
-  objectType: string,
+  objectType: ObjectType,
   position: Position,
   res: express.Response,
-  req: express.Request
+  color?: SoloonsColors,
+  direction?: ComethDirection
 ): Promise<void> => {
   const url = `${API_BASE_URL}/${objectType}`;
   let body: string;
@@ -100,7 +120,9 @@ const createAstralObject = async (
       } as Polyanet);
       break;
     case "soloons":
-      const color = req.body.color;
+      if (!color) {
+        throw res.status(400).json({ error: "Color is required for Soloon." });
+      }
       body = JSON.stringify({
         ...position,
         candidateId: CANDIDATE_ID,
@@ -108,7 +130,11 @@ const createAstralObject = async (
       } as Soloon);
       break;
     case "comeths":
-      const direction = req.body.direction;
+      if (!direction) {
+        throw res
+          .status(400)
+          .json({ error: "Direction is required for Cometh." });
+      }
       body = JSON.stringify({
         ...position,
         candidateId: CANDIDATE_ID,
@@ -129,7 +155,7 @@ const createAstralObject = async (
 };
 
 const deleteAstralObject = async (
-  objectType: string,
+  objectType: ObjectType,
   position: Position,
   res: express.Response
 ): Promise<void> => {
@@ -230,18 +256,113 @@ const resetMap = async (
   }
 };
 
-// Endpoint to create an astral object
-app.post("/api/:objectType", (req, res) => {
-  const { objectType } = req.params;
-  const { row, column } = req.body;
-  createAstralObject(objectType, { row, column }, res, req);
-});
+// Function to perform bulk operations
+const performBulkOperation = async (
+  bulkData: string[][],
+  res: express.Response,
+  delayBetweenRequests: number = 1000
+): Promise<void> => {
+  const operations: Array<{
+    type: string;
+    position: Position;
+    color?: SoloonsColors;
+    direction?: ComethDirection;
+  }> = [];
+  console.log(bulkData);
 
-// Endpoint to delete an astral object
-app.delete("/api/:objectType", (req, res) => {
-  const { objectType } = req.params;
-  const { row, column } = req.body;
-  deleteAstralObject(objectType, { row, column }, res);
+  try {
+    // Convert bulk data to individual operations
+    bulkData.forEach((rowData, row) => {
+      rowData.forEach((type, column) => {
+        operations.push({
+          type,
+          position: { row: String(row), column: String(column) },
+        });
+      });
+    });
+
+    // Perform bulk operation
+    for (const operation of operations) {
+      try {
+        const { type, position } = operation;
+        console.log("Type: ", type);
+        // Extract the object type from the type
+        const objectType =
+          type.indexOf("_") > 0
+            ? type.split("_")[1].toLowerCase() + "s"
+            : type.toLowerCase() + "s"; // Extract and convert to lowercase
+
+        console.log(
+          `Performing bulk operation: ${objectType} at ${position.row},${position.column}`
+        );
+        console.log("objectType: ", objectType);
+
+        // Extract color from the type if its a Soloon
+        let color = "blue" as SoloonsColors;
+        if (objectType === "soloons") {
+          color = type.split("_")[0].toLowerCase() as SoloonsColors;
+        }
+
+        // Extract direction from the type if its a Cometh
+        let direction = "up" as ComethDirection;
+        if (objectType === "comeths") {
+          direction = type.split("_")[0].toLowerCase() as ComethDirection;
+        }
+
+        switch (objectType) {
+          case "spaces":
+            // No need to send a request for a space
+            break;
+          case "polyanets":
+          case "soloons":
+
+          case "comeths":
+            // Pass the objectType, color, and direction to the createAstralObject function
+            await createAstralObject(
+              objectType,
+              position,
+              res,
+              color,
+              direction
+            );
+            break;
+          default:
+            throw new Error("Invalid astral object type.");
+        }
+
+        // Introduce a delay between requests only if the current request is successful
+        if (
+          delayBetweenRequests > 0 &&
+          operation !== operations[operations.length - 1]
+        ) {
+          await new Promise(resolve =>
+            setTimeout(resolve, delayBetweenRequests)
+          );
+        }
+      } catch (error) {
+        console.error(`Error performing bulk operation: ${error.message}`);
+        throw new Error("Internal Server Error");
+      }
+    }
+
+    res.status(200).json({ message: "Bulk operation completed successfully." });
+  } catch (error) {
+    console.error(`Error processing bulk data: ${error.message}`);
+    res.status(400).json({ error: "Invalid bulk data format." });
+  }
+};
+
+// Endpoint to perform bulk operations
+app.post("/api/bulkoperation", (req, res) => {
+  console.log(req.body);
+  const bulkData = req.body;
+  console.log(bulkData);
+
+  if (!bulkData || !Array.isArray(bulkData)) {
+    return res.status(400).json({ error: "Invalid bulk data array." });
+  }
+
+  performBulkOperation(bulkData, res);
 });
 
 // Endpoint to reset the map
@@ -249,7 +370,33 @@ app.delete("/api/reset-map", (req, res) => {
   resetMap(res);
 });
 
-// Endpoint to handle bulk create and delete operations
+// Endpoint to create an astral object
+app.post("/api/:objectType", (req, res) => {
+  const { row, column, color, direction } = req.body;
+  console.log(req.body);
+  // get the objectType from the last part of the path
+  const objectType = req.params.objectType;
+  console.log(objectType);
+
+  try {
+    createAstralObject(
+      objectType as ObjectType,
+      { row, column },
+      res,
+      color,
+      direction
+    );
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Endpoint to delete an astral object
+app.delete("/api/:objectType", (req, res) => {
+  const { objectType } = req.params;
+  const { row, column } = req.body;
+  deleteAstralObject(objectType as ObjectType, { row, column }, res);
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

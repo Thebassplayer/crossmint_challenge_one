@@ -1,6 +1,6 @@
 import express from "express";
 import bodyParser from "body-parser";
-import fetch, { Response } from "node-fetch";
+import fetch from "node-fetch";
 import * as dotenv from "dotenv";
 dotenv.config();
 
@@ -19,21 +19,43 @@ type PolyanetRequest = {
   body: string;
 };
 
+const retry = async <T>(
+  action: () => Promise<T>,
+  maxAttempts: number = 3
+): Promise<T> => {
+  let attempt = 1;
+
+  while (attempt <= maxAttempts) {
+    try {
+      return await action();
+    } catch (error) {
+      console.error(error);
+      console.log(`Attempt ${attempt} failed. Retrying...`);
+    }
+
+    attempt++;
+  }
+
+  throw new Error(`Max retries reached. Failed after ${maxAttempts} attempts.`);
+};
+
 const fetchPolyanet = async (
   url: string,
   request: PolyanetRequest,
   res: express.Response
 ): Promise<void> => {
   try {
-    const response = await fetch(url, request);
+    await retry(async () => {
+      const response = await fetch(url, request);
 
-    if (response.ok) {
-      res.status(200).json({ message: "Polyanet operation successful." });
-    } else {
-      res.status(response.status).json({ error: response.statusText });
-    }
+      if (response.ok) {
+        res.status(200).json({ message: "Polyanet operation successful." });
+      } else {
+        res.status(response.status).json({ error: response.statusText });
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+    });
   } catch (error) {
-    console.error(error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
@@ -71,43 +93,58 @@ const deletePolyanet = async (
 };
 
 // Function to reset the map
-const resetMap = async (res: express.Response): Promise<void> => {
+const resetMap = async (
+  res: express.Response,
+  delayBetweenRequests: number = 1000
+): Promise<void> => {
   const url = `${API_BASE_URL}/polyanets`;
 
   try {
-    // Assuming your map has 11x11 spaces
+    // 11x11 spaces map
     const rows = 11;
     const columns = 11;
 
-    const batchRequests: PolyanetRequest[] = [];
-
     // Iterate over all spaces and add delete requests to the batch
-    for (let row = 1; row <= rows; row++) {
-      for (let column = 1; column <= columns; column++) {
+    for (let row = 0; row <= rows - 1; row++) {
+      for (let column = 0; column <= columns - 1; column++) {
         const body = JSON.stringify({
           row: String(row),
           column: String(column),
           candidateId: CANDIDATE_ID,
         });
 
-        batchRequests.push({
+        const request: PolyanetRequest = {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body,
-        });
-      }
-    }
+        };
 
-    // Use Promise.all to send all delete requests in parallel
-    const responses = await Promise.all(
-      batchRequests.map(request => fetch(url, request))
-    );
+        console.log(`Sending request to ${url} with body:`, body);
 
-    // Check responses and handle errors if needed
-    for (const response of responses) {
-      if (!response.ok) {
-        res.status(response.status).json({ error: response.statusText });
-        return;
+        try {
+          const response = await fetch(url, request);
+
+          if (!response.ok) {
+            console.error(`Request failed with status ${response.status}`);
+            res
+              .status(response.status || 500)
+              .json({ error: response.statusText || "Internal Server Error" });
+            return;
+          }
+
+          console.log(`Request to ${url} successful.`);
+        } catch (error) {
+          console.error(`Error sending request: ${error.message}`);
+          res.status(500).json({ error: "Internal Server Error" });
+          return;
+        }
+
+        // Introduce a delay between requests
+        if (delayBetweenRequests > 0 && row < rows - 1) {
+          await new Promise(resolve =>
+            setTimeout(resolve, delayBetweenRequests)
+          );
+        }
       }
     }
 

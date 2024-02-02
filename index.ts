@@ -173,31 +173,6 @@ app.delete("/api/reset-map", (req, res) => {
 });
 
 // Endpoint to handle bulk create and delete operations
-app.post("/api/polyanets/batch", async (req, res) => {
-  const bulkData = req.body;
-
-  try {
-    for (const item of bulkData) {
-      const { type, data } = item;
-
-      if (type === "createPolyanet") {
-        await createPolyanet(data, res);
-      } else if (type === "deletePolyanet") {
-        await deletePolyanet(data, res);
-      } else {
-        res.status(400).json({ error: "Invalid operation type" });
-        return;
-      }
-    }
-
-    res
-      .status(200)
-      .json({ message: "Batch operations completed successfully." });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

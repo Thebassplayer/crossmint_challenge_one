@@ -133,17 +133,17 @@ const resetMap = async (
           }
 
           console.log(`Request to ${url} successful.`);
+
+          // Introduce a delay between requests only if the current request is successful
+          if (delayBetweenRequests > 0 && row < rows - 1) {
+            await new Promise(resolve =>
+              setTimeout(resolve, delayBetweenRequests)
+            );
+          }
         } catch (error) {
           console.error(`Error sending request: ${error.message}`);
           res.status(500).json({ error: "Internal Server Error" });
           return;
-        }
-
-        // Introduce a delay between requests
-        if (delayBetweenRequests > 0 && row < rows - 1) {
-          await new Promise(resolve =>
-            setTimeout(resolve, delayBetweenRequests)
-          );
         }
       }
     }

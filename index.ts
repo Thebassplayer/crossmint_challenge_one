@@ -1,3 +1,13 @@
+import {
+  AstralObjectRequest,
+  Cometh,
+  ComethDirection,
+  ObjectType,
+  Polyanet,
+  Position,
+  Soloon,
+  SoloonsColors,
+} from "./types";
 import express from "express";
 import bodyParser from "body-parser";
 import fetch from "node-fetch";
@@ -22,42 +32,11 @@ const logRequestsMiddleware = (
 // Apply middleware to log every request
 app.use(logRequestsMiddleware);
 
+// Load environment variables
 const API_BASE_URL = process.env.API_BASE_URL;
 const CANDIDATE_ID = process.env.CANDIDATE_ID;
 
-type Position = { row: string; column: string };
-type AstralObjectRequest = {
-  method: string;
-  headers: Record<string, string>;
-  body: string;
-};
-
-type Polyanet = {
-  row: string;
-  column: string;
-  candidateId: string;
-};
-
-type SoloonsColors = "blue" | "red" | "purple" | "white";
-
-type Soloon = {
-  row: string;
-  column: string;
-  candidateId: string;
-  color: SoloonsColors;
-};
-
-type ComethDirection = "up" | "down" | "right" | "left";
-
-type Cometh = {
-  row: string;
-  column: string;
-  candidateId: string;
-  direction: ComethDirection;
-};
-
-type ObjectType = "polyanets" | "soloons" | "comeths";
-
+// Function to retry an async action
 const retry = async <T>(
   action: () => Promise<T>,
   maxAttempts: number = 3
@@ -84,6 +63,7 @@ const retry = async <T>(
   throw new Error(`Max retries reached. Failed after ${maxAttempts} attempts.`);
 };
 
+// Function to fetch an astral object
 const fetchAstralObject = async (
   objectType: ObjectType,
   url: string,
@@ -114,6 +94,7 @@ const fetchAstralObject = async (
   }
 };
 
+// Function to create an astral object
 const createAstralObject = async (
   objectType: ObjectType,
   position: Position,
@@ -168,6 +149,7 @@ const createAstralObject = async (
   await fetchAstralObject(objectType, url, request, res);
 };
 
+// Function to delete an astral object
 const deleteAstralObject = async (
   objectType: ObjectType,
   position: Position,
@@ -208,6 +190,7 @@ const deleteAstralObject = async (
   await fetchAstralObject(objectType, url, request, res);
 };
 
+// Function to reset the map
 const resetMap = async (
   res: express.Response,
   delayBetweenRequests: number = 1000
@@ -304,7 +287,7 @@ const performBulkOperation = async (
         const objectType =
           type.indexOf("_") > 0
             ? type.split("_")[1].toLowerCase() + "s"
-            : type.toLowerCase() + "s"; // Extract and convert to lowercase
+            : type.toLowerCase() + "s";
 
         console.log(
           `Performing bulk operation: ${objectType} at ${position.row},${position.column}`
